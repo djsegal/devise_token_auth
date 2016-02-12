@@ -12,21 +12,12 @@ module DeviseTokenAuth
       # Check
       field = (resource_params.keys.map(&:to_sym) & resource_class.authentication_keys).first
 
-      @resource = nil
-      if field
-        q_value = resource_params[field]
+      q_value = resource_params[field]
+      if resource_class.case_insensitive_keys.include?(field)
+        q_value.downcase!
+      end
 
-        if resource_class.case_insensitive_keys.include?(field)
-          q_value.downcase!
-        end
-
-        q = "#{field.to_s} = ? AND provider='email'"
-
-        if ActiveRecord::Base.connection.adapter_name.downcase.starts_with? 'mysql'
-          q = "BINARY " + q
-        end
-
-        @resource = resource_class.where(q, q_value).first
+      set_resource(field, q_value)
       end
 
       if @resource and valid_params?(field, q_value) and @resource.valid_password?(resource_params[:password]) and (!@resource.respond_to?(:active_for_authentication?) or @resource.active_for_authentication?)
@@ -141,7 +132,9 @@ module DeviseTokenAuth
     private
 
     def resource_params
-      params.permit(*params_for_resource(:sign_in))
+      allowed_params = params_for_resource(:sign_in)
+      allowed_params += [:backup_field_name, :backup_field_class]
+      params.permit(*allowed_params)
     end
 
   end
