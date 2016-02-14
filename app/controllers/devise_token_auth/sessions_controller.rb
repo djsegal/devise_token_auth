@@ -12,12 +12,7 @@ module DeviseTokenAuth
       # Check
       field = (resource_params.keys.map(&:to_sym) & resource_class.authentication_keys).first
 
-      q_value = resource_params[field]
-      if resource_class.case_insensitive_keys.include?(field)
-        q_value.downcase!
-      end
-
-      set_resource(field, q_value)
+      set_resource(field)
       unless @resource.present?
         render_create_error_bad_credentials
         return
