@@ -30,9 +30,9 @@ module DeviseTokenAuth
       mapping.to
     end
 
-    def set_resource(default_identification, value)
+    def set_resource(default_identification)
       @resource = nil
-      return unless default_identification.present? && value.present?
+      return unless default_identification.present?
 
       resource_list = [[resource_class.name, default_identification]]
       backup_identification = resource_params[:backup_field_name]
@@ -47,11 +47,16 @@ module DeviseTokenAuth
       resource_list.each do |(class_name, field_name)|
         current_class = class_name.classify.constantize
 
+        field_key = ( field_name == 'uid' ) ? :email : field_name.to_sym
+        field_value = resource_params[field_name] || resource_params[:email]
+        field_value = field_value.downcase \
+          if resource_class.case_insensitive_keys.include?(field_key)
+
         q = current_class
         if ActiveRecord::Base.connection.adapter_name.downcase.starts_with? 'mysql'
-          q = q.where("BINARY #{field_name} = ?", value)
+          q = q.where("BINARY #{field_name} = ?", field_value)
         else
-          q = q.where(field_name => value)
+          q = q.where(field_name => field_value)
         end
 
         if current_class == resource_class
@@ -62,6 +67,7 @@ module DeviseTokenAuth
           next unless current_resource.present?
           @resource = current_resource.public_send(resource_class_name)
         end
+
         break if @resource.present?
       end
     end
