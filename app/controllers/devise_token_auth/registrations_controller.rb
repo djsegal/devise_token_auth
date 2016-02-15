@@ -224,7 +224,14 @@ module DeviseTokenAuth
         relation_class = relation_params.delete("#{relation}_type") || relation
         permitted_relation_params = params_for_resource(:sign_up).select{|p| p.is_a? Hash}.reduce({}, :merge)
 
-        resource_relation = relation_class.classify.constantize.new \
+        begin
+          relation_model = relation_class.classify.constantize
+        rescue NameError
+          add_resource_model_errors(relation_errors, relation_class)
+          next
+        end
+
+        resource_relation = relation_model.new \
           relation_params.permit(*permitted_relation_params[relation_attributes.to_sym])
         resource_relation.account = @resource
 
@@ -236,6 +243,14 @@ module DeviseTokenAuth
       end
       relation_errors.delete(:full_messages) if relation_errors[:full_messages].empty?
       return relation_errors
+    end
+
+    def add_resource_model_errors(relation_errors, relation_class)
+      relation_symbol = relation_class.to_sym
+      relation_error = "isn't a defined model"
+      relation_errors[relation_symbol] = [] unless relation_errors.include? relation_symbol
+      relation_errors[relation_symbol] << relation_error
+      relation_errors[:full_messages] << "#{relation_class.classify} #{relation_error}"
     end
   end
 end

@@ -11,9 +11,11 @@ module DeviseTokenAuth
     end
 
     def resource_errors(error_hash={}, current_resource=@resource)
-      error_hash[:full_messages] = [] if error_hash.empty?
-      error_hash.merge!(current_resource.errors.to_hash)
+      error_hash[:full_messages] = [] unless error_hash.include? :full_messages
       error_hash[:full_messages] += current_resource.errors.full_messages
+      error_hash.merge!(current_resource.errors.to_hash) do |key, v1, v2|
+        v1 + v2
+      end
       error_hash
     end
 
