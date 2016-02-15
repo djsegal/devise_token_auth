@@ -890,5 +890,57 @@ class DeviseTokenAuth::RegistrationsControllerTest < ActionDispatch::Integration
         assert @resource.confirmed?
       end
     end
+
+    describe 'Associated relations' do
+      before do
+        @valid_json = {
+          email: Faker::Internet.email,
+          password: "secret123",
+          password_confirmation: "secret123",
+          confirm_success_url: Faker::Internet.url,
+          owner_attributes: {
+            owner_type: "company",
+            other_field: "owner_other_field"
+          },
+          profile_attributes: {
+            other_field: "profile_other_field"
+          }
+        }
+      end
+
+      def json_without(key, value=nil)
+        invalid_json = @valid_json.deep_dup
+        if value.present?
+          invalid_json[key].delete(value)
+        else
+          invalid_json.delete(key)
+        end
+        invalid_json
+      end
+
+      test 'where all are valid' do
+        post "/accounts", @valid_json
+        assert_equal 200, response.status
+      end
+
+      test 'where basic has_one relationship is invalid' do
+        post "/accounts", json_without(:profile_attributes)
+        assert_equal 422, response.status
+        post "/accounts", json_without(:profile_attributes, :other_field)
+        assert_equal 422, response.status
+      end
+
+      test 'where polymorphic belongs_to relationship is invalid' do
+        post "/accounts", json_without(:owner_attributes)
+        assert_equal 422, response.status
+        post "/accounts", json_without(:owner_attributes, :other_field)
+        assert_equal 422, response.status
+
+        assert_raise NameError do
+          post "/accounts", json_without(:owner_attributes, :owner_type)
+        end
+      end
+    end
+
   end
 end

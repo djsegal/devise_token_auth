@@ -10,8 +10,11 @@ module DeviseTokenAuth
       response_data
     end
 
-    def resource_errors
-      return @resource.errors.to_hash.merge(full_messages: @resource.errors.full_messages)
+    def resource_errors(error_hash={}, current_resource=@resource)
+      error_hash[:full_messages] = [] if error_hash.empty?
+      error_hash.merge!(current_resource.errors.to_hash)
+      error_hash[:full_messages] += current_resource.errors.full_messages
+      error_hash
     end
 
     protected
