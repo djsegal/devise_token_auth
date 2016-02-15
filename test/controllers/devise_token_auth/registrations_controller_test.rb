@@ -935,10 +935,8 @@ class DeviseTokenAuth::RegistrationsControllerTest < ActionDispatch::Integration
         assert_equal 422, response.status
         post "/accounts", json_without(:owner_attributes, :other_field)
         assert_equal 422, response.status
-
-        assert_raise NameError do
-          post "/accounts", json_without(:owner_attributes, :owner_type)
-        end
+        post "/accounts", json_without(:owner_attributes, :owner_type)
+        assert_equal 422, response.status
       end
     end
 
