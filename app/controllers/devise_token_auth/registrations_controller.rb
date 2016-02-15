@@ -38,7 +38,10 @@ module DeviseTokenAuth
         # override email confirmation, must be sent manually from ctrl
         resource_class.set_callback("create", :after, :send_on_create_confirmation_instructions)
         resource_class.skip_callback("create", :after, :send_on_create_confirmation_instructions)
-        if @resource.save
+
+        relation_errors = make_resource_relations
+        if @resource.valid? && relation_errors.empty?
+          @resource.save!
           yield @resource if block_given?
 
           unless @resource.confirmed?
@@ -65,7 +68,7 @@ module DeviseTokenAuth
           render_create_success
         else
           clean_up_passwords @resource
-          render_create_error
+          render_create_error(relation_errors)
         end
       rescue ActiveRecord::RecordNotUnique
         clean_up_passwords @resource
@@ -98,7 +101,7 @@ module DeviseTokenAuth
     end
 
     def sign_up_params
-      params.permit(*params_for_resource(:sign_up))
+      params.except(*attribute_params.keys).permit(*params_for_resource(:sign_up))
     end
 
     def account_update_params
@@ -130,11 +133,11 @@ module DeviseTokenAuth
       }
     end
 
-    def render_create_error
+    def render_create_error(relation_errors)
       render json: {
         status: 'error',
         data:   resource_data,
-        errors: resource_errors
+        errors: resource_errors(relation_errors)
       }, status: 422
     end
 
@@ -208,6 +211,31 @@ module DeviseTokenAuth
          status: 'error',
          errors: [message]
       }, status: :unprocessable_entity if which.empty?
+    end
+
+    def attribute_params
+      params.select { |key, value| key.to_s.match(/_attributes/) }
+    end
+
+    def make_resource_relations
+      relation_errors = {full_messages: []}
+      attribute_params.each do |relation_attributes, relation_params|
+        relation = relation_attributes.sub "_attributes", ''
+        relation_class = relation_params.delete("#{relation}_type") || relation
+        permitted_relation_params = params_for_resource(:sign_up).select{|p| p.is_a? Hash}.reduce({}, :merge)
+
+        resource_relation = relation_class.classify.constantize.new \
+          relation_params.permit(*permitted_relation_params[relation_attributes.to_sym])
+        resource_relation.account = @resource
+
+        if resource_relation.valid?
+          @resource.assign_attributes(relation => resource_relation)
+        else
+          resource_errors(relation_errors, resource_relation)
+        end
+      end
+      relation_errors.delete(:full_messages) if relation_errors[:full_messages].empty?
+      return relation_errors
     end
   end
 end
